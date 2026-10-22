@@ -137,7 +137,14 @@
     };
   }
 
-  function entryResult(e) { return e.kind === 'putz' ? putzResult(e) : betonResult(e); }
+  /** Beton/Putz hier; alle weiteren Arten (Mauerwerk, Fliesen, …) liefert js/calcs.js. Alte Einträge ohne kind = Beton. */
+  function calcs() { return typeof module === 'object' && module.exports ? require('./calcs.js') : (typeof self !== 'undefined' ? self.Calcs : null); }
+  function entryResult(e) {
+    if (e.kind === 'putz') return putzResult(e);
+    if (!e.kind || e.kind === 'beton') return betonResult(e);
+    const C = calcs();
+    return C ? C.result(e) : { lines: [], cost: null };
+  }
 
   /** Aggregate order lines over all entries. Bags: ceil(sum of exact) per product; continuous units summed. */
   function aggregate(entries) {

@@ -27,6 +27,7 @@
   let listSel = null;        // selected Querschnitt-Gruppe in Holzliste ('neu' = new)
   let draftQty = 1;
   let matDraft = null;       // Material entry being edited
+  let matPicking = false; let pickName = '';    // Material-Art-Auswahl offen
   let menuFor = null;        // project id with open actions
   let showNewProject = false;
   let orderFilter = 'alle';
@@ -74,7 +75,7 @@
   function normProject(p) {
     p.items = Array.isArray(p.items) ? p.items : [];
     p.stock = p.stock || {}; p.orders = p.orders || {};
-    p.materials = Array.isArray(p.materials) ? p.materials : [];
+    p.materials = (Array.isArray(p.materials) ? p.materials : []).map(m => m.kind ? m : { ...m, kind: 'beton' }); // alte Einträge ohne Art = Beton
     if (p.kerf == null) p.kerf = DEFAULT_KERF;
     return p;
   }
@@ -140,7 +141,7 @@
   function go(tab) { if (location.hash !== '#/' + tab) location.hash = '#/' + tab; else render(); }
   window.addEventListener('hashchange', () => { render(); window.scrollTo(0, 0); });
 
-  const TITLES = { projekte: 'Meine Projekte', liste: 'Holzliste', lager: 'Lager & Preise', zuschnitt: 'Zuschnittplan', material: 'Beton & Putz', bestellung: 'Bestellung' };
+  const TITLES = { projekte: 'Meine Projekte', liste: 'Holzliste', lager: 'Lager & Preise', zuschnitt: 'Zuschnittplan', material: 'Material', bestellung: 'Bestellung' };
   const ICON = {
     plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', check: '<path d="m5 12 5 5L20 7"/>',
     dots: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
@@ -152,7 +153,7 @@
   function render() {
     const tab = currentTab();
     const p = current();
-    $('#current-project').textContent = tab === 'projekte' ? 'Holzwerk' : (p ? p.name : 'Kein Projekt');
+    $('#current-project').textContent = tab === 'projekte' ? 'Blaupause' : (p ? p.name : 'Kein Projekt');
     $('#page-title').textContent = TITLES[tab];
     $('#top-action').innerHTML = tab === 'projekte'
       ? `<button class="iconbtn iconbtn--acc" data-act="toggle-new-project" aria-label="Neues Projekt">${ic('plus')}</button>` : '';
@@ -203,7 +204,7 @@
         <ul class="steps">${step(p.items.length, 'Liste')}${step(p.items.length, 'Zuschnitt')}${step(p.materials.length, 'Material')}
           <li class="cur">Geliefert ${done}/${lines.length}</li></ul>
         <div class="kpis"><div><b>${fmt(st.netM, 2)} m</b><span>Holz netto</span></div><div><b>${stangen}</b><span>Stangen</span></div>
-          <div><b>${p.materials.length}</b><span>Beton/Putz</span></div></div>
+          <div><b>${p.materials.length}</b><span>Material</span></div></div>
         <button class="btn btn--white btn--block" data-go="${p.items.length ? 'zuschnitt' : 'liste'}">${p.items.length ? 'Weiter: Zuschnitt ansehen' : 'Weiter: Holzliste anlegen'}</button>
       </div>`;
     }).join('');
@@ -351,12 +352,16 @@
       ${cards}`;
   }
 
-  // ---------- views: Material (Beton & Putz) ----------
+  // ---------- views: Material (Beton, Putz + Rechner aus js/calcs.js) ----------
+  const isClassic = k => !k || k === 'beton' || k === 'putz';
+  const KIND_INFO = { beton: { label: 'Beton', sub: 'Fundamente, Löcher, Platten', cat: 'rohbau' }, putz: { label: 'Putz', sub: 'Wand − Öffnungen', cat: 'rohbau' } };
+  const kindInfo = k => KIND_INFO[k || 'beton'] || Calcs.CALCS[k] || { label: k, cat: 'sonst' };
   const NUM_FIELDS = ['diameter', 'depth', 'length', 'width', 'height', 'area', 'thickness', 'qty', 'zuschlag', 'bagKg', 'bagLitres', 'bagPrice',
     'ratio', 'cementBagKg', 'cementBagPrice', 'kiesPricePerT', 'transportPrice', 'kgPerM2mm'];
   const vIn = v => v == null || v === '' ? '' : String(v).replace('.', ',');
   const toNum = v => { const x = num(v); return isFinite(x) ? x : null; };
   function newDraft(kind) {
+    if (Calcs.CALCS[kind]) return { kind, name: '', ...Calcs.CALCS[kind].defaults() };
     if (kind === 'putz') {
       const t = Material.PUTZ_TYPES[0];
       return { kind, name: '', mode: 'wand', length: '', height: '', openings: [], area: '', thickness: 15, type: t.id, kgPerM2mm: t.kgPerM2mm, zuschlag: Material.DEFAULT_ZUSCHLAG, bagKg: t.bagKg, bagPrice: '' };
@@ -368,12 +373,13 @@
   }
   function cleanEntry(d) {
     const o = { ...d };
-    for (const f of NUM_FIELDS) if (f in o) o[f] = toNum(o[f]);
+    for (const f of (isClassic(o.kind) ? NUM_FIELDS : Calcs.numFields(o.kind))) if (f in o) o[f] = toNum(o[f]);
     if (o.openings) o.openings = o.openings.map(x => ({ name: x.name || '', width: toNum(x.width), height: toNum(x.height), qty: toNum(x.qty) ?? 1 }));
-    o.name = (o.name || '').trim() || (o.kind === 'putz' ? 'Putzfläche' : 'Beton');
+    o.name = (o.name || '').trim() || (o.kind === 'putz' ? 'Putzfläche' : kindInfo(o.kind).label);
     return o;
   }
   function describe(e) {
+    if (!isClassic(e.kind)) return Calcs.CALCS[e.kind] ? Calcs.CALCS[e.kind].describe(e) : '';
     if (e.kind === 'putz') {
       const r = Material.putzResult(e);
       const area = e.mode === 'direkt' ? `${fmt(r.net, 2)} m²` : `${fmt(n0(e.length), 2)} × ${fmt(n0(e.height), 2)} m${r.openings ? ` − ${fmt(r.openings, 2)} m² Öffnungen` : ''} = ${fmt(r.net, 2)} m²`;
@@ -389,6 +395,11 @@
   function resultHtml(e) {
     const r = Material.entryResult(e);
     const cost = r.cost != null ? `<div class="mres__cost">${eur(r.cost)}</div>` : '';
+    if (!isClassic(e.kind)) {
+      const side = r.side ? `<div class="mres__bags"><b>${esc(String(r.side.n))}</b><span>${esc(r.side.label)}</span>${r.side.small ? `<small>${esc(r.side.small)}</small>` : ''}</div>` : '';
+      return `<div class="mres"><div><b class="big">${esc(r.big)}</b><span>${esc(r.sub || '')}</span></div>${side}</div>
+        ${(r.info || []).length ? `<ul class="mres__info">${r.info.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}${cost}`;
+    }
     if (e.kind === 'putz') {
       return `<div class="mres"><div><b class="big">${fmt(r.kgTotal, 0)} kg</b><span>${fmt(r.kg, 0)} kg + ${fmt(r.zuschlag, 0)} % Zuschlag<br>${fmt(r.kgPerM2mm, 2)} kg/m²/mm</span></div>
         <div class="mres__bags"><b>${r.bags}</b><span>Sack à ${fmt(r.bagKg)} kg</span><small>(${fmt(r.bagsExact, 2)})</small></div></div>${cost}`;
@@ -401,9 +412,47 @@
   }
   const seg = (field, val, opts) => `<div class="seg3" role="group">${opts.map(([v, l]) => `<button type="button" class="${val === v ? 'on' : ''}" data-act="mf-set" data-f="${field}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const mf = (f, label, unit, d, extra = '') => `<label class="field"><span class="lbl">${label}</span><span class="inp inp--sm"><input inputmode="decimal" data-mf="${f}" value="${esc(vIn(d[f]))}" ${extra}><span>${unit}</span></span></label>`;
+  const opensHtml = d => `<span class="lbl">Öffnungen (Fenster, Türen)</span>
+          ${(d.openings || []).map((o, i) => `<div class="open-row">
+            <input data-mo="${i}" data-of="name" value="${esc(o.name)}" placeholder="Fenster" aria-label="Name">
+            <input data-mo="${i}" data-of="width" inputmode="decimal" class="mono" value="${esc(vIn(o.width))}" placeholder="B m" aria-label="Breite in m">
+            <input data-mo="${i}" data-of="height" inputmode="decimal" class="mono" value="${esc(vIn(o.height))}" placeholder="H m" aria-label="Höhe in m">
+            <input data-mo="${i}" data-of="qty" inputmode="numeric" class="mono" value="${esc(vIn(o.qty))}" placeholder="Stk" aria-label="Anzahl">
+            <button type="button" class="iconbtn iconbtn--xs" data-act="open-del" data-idx="${i}" aria-label="Öffnung entfernen">${ic('x', 's')}</button></div>`).join('')}
+          <button type="button" class="btn btn--ghost btn--sm" data-act="open-add">${ic('plus', 's')} Öffnung</button>`;
+  /** Generischer Editor aus der Feldbeschreibung in js/calcs.js. */
+  function genericFields(list, d) {
+    const vis = x => !x.show || x.show(d);
+    return list.filter(vis).map(x => {
+      if (x.t === 'row') {
+        const items = x.items.filter(vis); if (!items.length) return '';
+        const cells = genericFields(items, d) + (items.length === 1 ? '<span class="field"></span>' : '');
+        return x.price ? `<div class="frow frow--price">${cells}</div>` : `<div class="frow">${cells}</div>`;
+      }
+      if (x.t === 'num') return mf(x.f, x.label, x.unit || '', d, (x.inputmode ? `inputmode="${x.inputmode}"` : '') + (x.ph ? ` placeholder="${x.ph}"` : ''));
+      if (x.t === 'text') return `<label class="field"><span class="lbl">${esc(x.label)}</span><input data-mf="${x.f}" value="${esc(d[x.f] ?? '')}" placeholder="${esc(x.ph || '')}"></label>`;
+      if (x.t === 'seg') return seg(x.f, String(d[x.f]), x.opts);
+      if (x.t === 'select') {
+        const opts = x.opts; const known = opts.some(([v]) => v === String(d[x.f]));
+        return `<label class="field"><span class="lbl">${esc(x.label)}</span><select data-mf="${x.f}">${opts.map(([v, l]) => `<option value="${esc(v)}" ${(known ? String(d[x.f]) === v : v === 'eigen') ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>`;
+      }
+      if (x.t === 'openings') return opensHtml(d);
+      if (x.t === 'lbl') return `<span class="lbl lbl--sec">${esc(x.text)}</span>`;
+      if (x.t === 'note') return `<p class="muted small">${esc(x.text(d))}</p>`;
+      return '';
+    }).join('');
+  }
+  function pickerHtml() {
+    return `<div class="card picker"><div class="cgh"><b>Was möchtest du berechnen?</b><button class="iconbtn iconbtn--xs" data-act="mat-cancel" aria-label="Schließen">${ic('x', 's')}</button></div>
+      ${Calcs.CATEGORIES.map(c => `<div class="pick-cat"><span class="eyebrow">${esc(c.label)}</span><div class="pick-grid">
+        ${c.kinds.map(k => { const ki = kindInfo(k); return `<button type="button" class="pick pick--${ki.cat}" data-act="mat-new" data-kind="${k}"><b>${esc(ki.label)}</b><span>${esc(ki.sub)}</span></button>`; }).join('')}
+      </div></div>`).join('')}</div>`;
+  }
   function editorHtml(d) {
     let body = '';
-    if (d.kind === 'beton') {
+    const generic = !isClassic(d.kind);
+    if (generic) body = genericFields(Calcs.CALCS[d.kind].fields(), d);
+    else if (d.kind === 'beton') {
       body += seg('shape', d.shape, [['rund', 'Loch rund'], ['eckig', 'Loch eckig'], ['flaeche', 'Fläche']]);
       if (d.shape === 'rund') body += `<div class="frow">${mf('diameter', 'Durchmesser', 'cm', d)}${mf('depth', 'Tiefe', 'cm', d)}${mf('qty', 'Anzahl', 'Stk', d, 'inputmode="numeric"')}</div>`;
       else if (d.shape === 'eckig') body += `<div class="frow">${mf('length', 'Länge', 'cm', d)}${mf('width', 'Breite', 'cm', d)}</div><div class="frow">${mf('depth', 'Tiefe', 'cm', d)}${mf('qty', 'Anzahl', 'Stk', d, 'inputmode="numeric"')}</div>`;
@@ -430,14 +479,7 @@
       body += seg('mode', d.mode, [['wand', 'Wand − Öffnungen'], ['direkt', 'Fläche direkt']]);
       if (d.mode === 'wand') {
         body += `<div class="frow">${mf('length', 'Wandlänge', 'm', d)}${mf('height', 'Höhe', 'm', d)}</div>
-          <span class="lbl">Öffnungen (Fenster, Türen)</span>
-          ${(d.openings || []).map((o, i) => `<div class="open-row">
-            <input data-mo="${i}" data-of="name" value="${esc(o.name)}" placeholder="Fenster" aria-label="Name">
-            <input data-mo="${i}" data-of="width" inputmode="decimal" class="mono" value="${esc(vIn(o.width))}" placeholder="B m" aria-label="Breite in m">
-            <input data-mo="${i}" data-of="height" inputmode="decimal" class="mono" value="${esc(vIn(o.height))}" placeholder="H m" aria-label="Höhe in m">
-            <input data-mo="${i}" data-of="qty" inputmode="numeric" class="mono" value="${esc(vIn(o.qty))}" placeholder="Stk" aria-label="Anzahl">
-            <button type="button" class="iconbtn iconbtn--xs" data-act="open-del" data-idx="${i}" aria-label="Öffnung entfernen">${ic('x', 's')}</button></div>`).join('')}
-          <button type="button" class="btn btn--ghost btn--sm" data-act="open-add">${ic('plus', 's')} Öffnung</button>`;
+          ${opensHtml(d)}`;
       } else body += `<div class="frow">${mf('area', 'Putzfläche', 'm²', d)}<span class="field"></span></div>`;
       body += `<label class="field"><span class="lbl">Putzart</span><select data-mf="type">
           ${Material.PUTZ_TYPES.map(t => `<option value="${t.id}" ${d.type === t.id ? 'selected' : ''}>${t.label} (${fmt(t.kgPerM2mm, 2)} kg/m²/mm)</option>`).join('')}</select></label>
@@ -445,8 +487,9 @@
         <div class="frow">${mf('zuschlag', 'Zuschlag', '%', d)}${mf('bagKg', 'Sack', 'kg', d)}${mf('bagPrice', 'Preis/Sack', '€', d, 'placeholder="–"')}</div>`;
     }
     return `<form class="card form editor" data-form="material">
-      ${matDraft.id ? '' : seg('kind', d.kind, [['beton', 'Beton'], ['putz', 'Putz']])}
-      <label class="field"><span class="lbl">Bezeichnung</span><input data-mf="name" value="${esc(d.name)}" placeholder="${d.kind === 'putz' ? 'z. B. Kellerwand Nord' : 'z. B. Pfostenlöcher'}"></label>
+      <div class="cgh"><span class="pill pill--${kindInfo(d.kind).cat}">${esc(kindInfo(d.kind).label)}</span><b>${matDraft.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</b>
+        ${matDraft.id ? '' : `<button type="button" class="btn btn--ghost btn--xs" data-act="mat-pick">Art wechseln</button>`}</div>
+      <label class="field"><span class="lbl">Bezeichnung</span><input data-mf="name" value="${esc(d.name)}" placeholder="${esc(generic ? Calcs.CALCS[d.kind].ph : d.kind === 'putz' ? 'z. B. Kellerwand Nord' : 'z. B. Pfostenlöcher')}"></label>
       ${body}
       <div class="mprev" id="mat-preview">${resultHtml(d)}</div>
       <div class="row"><button class="btn btn--pri grow">${matDraft.id ? 'Änderung speichern' : 'Eintrag hinzufügen'}</button>
@@ -463,19 +506,18 @@
         <button class="btn btn--ghost btn--sm" data-go="bestellung">In Bestellung ansehen</button>
       </div>` : '';
     const entryHtml = e => `<div class="card mentry">
-        <div class="cgh"><span class="pill ${e.kind === 'putz' ? 'pill--putz' : 'pill--beton'}">${e.kind === 'putz' ? 'Putz' : 'Beton'}</span><b>${esc(e.name)}</b>
+        <div class="cgh"><span class="pill pill--${kindInfo(e.kind).cat}">${esc(kindInfo(e.kind).label)}</span><b>${esc(e.name)}</b>
           <button class="iconbtn iconbtn--xs" data-act="mat-edit" data-id="${e.id}" aria-label="Bearbeiten">${ic('edit', 's')}</button>
           <button class="iconbtn iconbtn--xs" data-act="mat-del" data-id="${e.id}" aria-label="Löschen">${ic('x', 's')}</button></div>
         <p class="mdesc">${esc(describe(e))}</p>
         ${resultHtml(e)}
       </div>`;
-    const adders = `<div class="row adders"><button class="btn btn--pri btn--sm grow" data-act="mat-new" data-kind="beton">${ic('plus', 's')} Beton</button>
-        <button class="btn btn--acc btn--sm grow" data-act="mat-new" data-kind="putz">${ic('plus', 's')} Putz</button></div>`;
-    return `${matDraft && !matDraft.id ? editorHtml(matDraft) : adders}
+    const adders = `<div class="row adders"><button class="btn btn--pri grow" data-act="mat-pick">${ic('plus', 's')} Material berechnen</button></div>`;
+    return `${matDraft && !matDraft.id ? editorHtml(matDraft) : matPicking ? pickerHtml() : adders}
       ${p.materials.map(e => (matDraft && matDraft.id === e.id) ? editorHtml(matDraft) : entryHtml(e)).join('')}
       ${total}
-      ${!p.materials.length && !matDraft ? '<p class="muted center">Noch keine Einträge. Lege Beton für Fundamente/Löcher oder Putz für Wände an.</p>' : ''}
-      <p class="foot muted">Richtwerte nach Herstellerangaben (Baumit, Sakret, Knauf, ClayTec). Verbrauch und Ergiebigkeit immer auf dem Sack prüfen.</p>`;
+      ${!p.materials.length && !matDraft ? '<p class="muted center">Noch keine Einträge. Beton, Putz, Mauerwerk, Estrich, Fliesen, Trockenbau, Dämmung, Farbe, Schüttgut, Pflaster, Dach oder freie Positionen anlegen.</p>' : ''}
+      <p class="foot muted">Richtwerte nach Herstellerangaben (u. a. Baumit, Sakret, Knauf, Xella, Alpina) – alle Vorgaben sind änderbar. Verbrauch und Ergiebigkeit immer auf Sack/Etikett prüfen.</p>`;
   }
 
   // ---------- views: Bestellung ----------
@@ -517,7 +559,7 @@
       t += `Summe Holz: ${fmt(lfm, 2)} lfm\n`;
     }
     if (mat.length) {
-      t += '\nBeton & Putz:\n';
+      t += '\nMaterial:\n';
       for (const l of mat) {
         t += `- ${matQty(l)} ${l.label}${l.entries.length ? ` (für: ${l.entries.join(', ')})` : ''}\n`;
         if (l.cost == null) allPriced = false; else cost += l.cost;
@@ -536,7 +578,7 @@
 
   function viewOrder(p) {
     const lines = orderLines(p);
-    if (!lines.length) return `<p class="muted center">Erst Positionen in der Holzliste oder Beton/Putz anlegen.</p>`;
+    if (!lines.length) return `<p class="muted center">Erst Positionen in der Holzliste oder im Tab Material anlegen.</p>`;
     let total = 0, priced = true;
     for (const l of lines) { if (l.cost == null) priced = false; else total += l.cost; }
     const cnt = s => lines.filter(l => l.status === s).length;
@@ -559,7 +601,7 @@
       </div>
       <div class="chips filt">${['alle', ...STATUSES].map(s => `<button class="chip ${orderFilter === s ? 'on' : ''}" data-act="order-filter" data-v="${s}">${s[0].toUpperCase() + s.slice(1)}</button>`).join('')}</div>
       ${wood.length ? `<div class="card mlist"><div class="grph"><span>Holz</span></div>${wood.map(row).join('')}</div>` : ''}
-      ${mat.length ? `<div class="card mlist"><div class="grph"><span>Beton &amp; Putz</span></div>${mat.map(row).join('')}</div>` : ''}
+      ${mat.length ? `<div class="card mlist"><div class="grph"><span>Material</span></div>${mat.map(row).join('')}</div>` : ''}
       ${!shown.length ? '<p class="muted center">Keine Positionen mit diesem Status.</p>' : ''}
       <div class="card stack">
         <h3>Text für Anfrage</h3>
@@ -586,9 +628,10 @@
         const v = Math.max(1, (parseInt(inp.value, 10) || 1) + (act === 'qty-inc' ? 1 : -1));
         inp.value = v; if (!editingItemId) draftQty = v; break;
       }
-      case 'mat-new': matDraft = newDraft(el.dataset.kind); render(); window.scrollTo(0, 0); break;
+      case 'mat-pick': pickName = matDraft && !matDraft.id ? (matDraft.name || '') : ''; matDraft = null; matPicking = true; render(); window.scrollTo(0, 0); break;
+      case 'mat-new': { const keep = pickName; pickName = ''; matPicking = false; matDraft = { ...newDraft(el.dataset.kind), name: keep || '' }; render(); window.scrollTo(0, 0); break; }
       case 'mat-edit': { const e = p.materials.find(m => m.id === id); matDraft = JSON.parse(JSON.stringify(e)); render(); break; }
-      case 'mat-cancel': matDraft = null; render(); break;
+      case 'mat-cancel': matDraft = null; matPicking = false; render(); break;
       case 'mat-del': {
         const e = p.materials.find(m => m.id === id);
         if (!confirm(`„${e.name}“ löschen?`)) return;
@@ -597,7 +640,7 @@
       case 'mf-set': {
         const f = el.dataset.f, v = el.dataset.v;
         if (f === 'kind') { if (matDraft.kind !== v) matDraft = { ...newDraft(v), name: matDraft.name }; }
-        else matDraft[f] = v;
+        else { matDraft[f] = v; const c = Calcs.CALCS[matDraft.kind]; if (c && c.onSet) c.onSet(matDraft, f, v); }
         render(); break;
       }
       case 'open-add': matDraft.openings = [...(matDraft.openings || []), { name: '', width: '', height: '', qty: 1 }]; render(); break;
@@ -657,7 +700,9 @@
   document.addEventListener('change', ev => {
     const el = ev.target, act = el.dataset.act, p = current();
     if (el.tagName === 'SELECT' && el.dataset.mf && matDraft) {
-      if (el.dataset.mf === 'bagPreset') {
+      const c = Calcs.CALCS[matDraft.kind];
+      if (c) { matDraft[el.dataset.mf] = el.value; if (c.onSelect) c.onSelect(matDraft, el.dataset.mf, el.value); }
+      else if (el.dataset.mf === 'bagPreset') {
         const b = Material.BETON_BAGS.find(x => x.id === el.value);
         if (b) { matDraft.bagKg = b.kg; matDraft.bagLitres = b.litres; }
       } else if (el.dataset.mf === 'type') {
@@ -732,7 +777,22 @@
   save();
   render();
   if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW', e)));
+    // Neue Version: sw.js ruft skipWaiting()/clients.claim() auf → controllerchange. Nur wenn vorher schon ein SW
+    // aktiv war (also echtes Update, nicht Erstinstallation), Hinweis „Update verfügbar“ mit Neu-laden-Knopf zeigen.
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadController) showUpdate(); });
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(reg => {
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    }).catch(e => console.warn('SW', e)));
+  }
+  function showUpdate() {
+    if (document.getElementById('update-bar')) return;
+    const b = document.createElement('div');
+    b.id = 'update-bar'; b.className = 'updatebar'; b.setAttribute('role', 'status');
+    b.innerHTML = '<span>Update verfügbar</span><button class="btn btn--pri btn--sm" type="button">Neu laden</button>';
+    b.querySelector('button').addEventListener('click', () => location.reload());
+    document.body.appendChild(b);
   }
   // for tests/debugging
   window.BauplanerApp = { get state() { return state; }, optimizeProject, orderText, orderLines };
