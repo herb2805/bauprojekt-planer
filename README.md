@@ -42,11 +42,15 @@ Was die neuen Rechner können:
 - **Mauerwerk:** L × H minus Öffnungen, Stein-Vorlagen (Porenbeton, KS 2 DF/3 DF, Planziegel, Schalungsstein) mit St./m², Steinanzahl und Mörtelsäcken. Der Füllbeton von Schalsteinen landet auf derselben Sackposition wie der Beton-Rechner.
 - **Estrich:** Fläche × Dicke × kg/m²/mm, ergibt die Säcke.
 - **Fliesen:** Verschnitt 10 % (gerade) oder 15 % (diagonal), Pakete, Kleber nach Zahnung, Fugenmasse nach der Formel (A+B)/(A·B)·b·t·K.
-- **Trockenbau:** Wand oder Decke, GK-Platten 1250×2000/2600, CW/UW mit 62,5 cm Achsabstand bzw. CD/UD, Schrauben, Spachtel, Fugenband.
+- **Trockenbau:** Wand oder Decke, GK-Platten 1250×2000/2600, Spachtel, Fugenband. Unterkonstruktion wählbar:
+  - **Metall** (Standard, auch für alte Einträge): CW/UW mit 62,5 cm Achsabstand bzw. CD/UD; Schnellbauschrauben **Feingewinde** 3,5×25 (2-lagig 3,5×35).
+  - **Holz:** Wand mit Kantholz 60×60 / 40×60 / 60×80 mm (oder eigener Querschnitt), Achsabstand 62,5 cm, Schwelle oben + unten; Decke mit Traglattung 24×48 / 30×50 mm, Achsabstand 50 cm (12,5 mm quer), optional Grund- + Traglattung (Grundlatte 80 cm, Kreuzungspunkte mit 4,3×55 verschraubt). Ausgabe in lfm und Stück bei einstellbarer Lieferlänge (Kantholz 5 m, Latten 4 m); Schnellbauschrauben **Grobgewinde** 3,9×35 (2-lagig 3,9×45).
+  - Optional **Befestigung UK** (Schrauben + Dübel je m Anschluss, Paketgröße).
+  - Quellen: DIN 18181 (max. UK-Abstände), Knauf W111 / D111 Systemblätter, Knauf „Montage- und Befestigungstechnik“ (Schraubentypen, Eindringtiefe) – siehe Kommentare in `js/calcs.js`.
 - **Dämmung:** m², m³, Pakete.
 - **Farbe / Lasur:** l/m² × Anstriche, ergibt die Gebinde.
 - **Schüttgut:** m³ inkl. Verdichtung, Tonnen lose oder Big Bags.
-- **Pflaster:** m², Splittbettung in t, Fugensand-Säcke.
+- **Pflaster / Platten:** Stückzahl aus Format + Fuge: St./m² = 1 ÷ ((L + Fuge) × (B + Fuge)), Gesamtstück inkl. Verschnitt (aufgerundet). Presets Rechteckpflaster 20×10 / 24×16, Quadratpflaster 14×14 / 20×20, Terrassenplatten 40×40, 50×50, 60×30, 60×60, 80×40, 100×50 oder eigenes Maß; Fuge Standard 4 mm (3–5 mm). Optional Herstellerwert „St./m²“ (z. B. Verbundpflaster) und Palette (m² oder Stk) → Anzahl Paletten. Preis je Stück oder je m². Dazu Splittbettung in t und Fugensand (automatisch aus Format/Fuge/Dicke). Bestellung z. B. „990 Stk Rechteckpflaster 20×10×8 cm (≈ 21,0 m²)“. Alte Einträge ohne Format bleiben m²-basiert.
 - **Dach:** Platten mit Überlappung und Schrauben, oder Folie in Rollen.
 - **Freie Position:** Menge mit Einheit (Stk, Pck, m, m², kg, l, …) und Preis.
 

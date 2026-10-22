@@ -501,7 +501,7 @@
     const total = p.materials.length ? `<div class="card costcard">
         <div class="ctop"><span class="muted">Projekt gesamt · ${p.materials.length} Einträge</span>${agg.cost != null ? `<span class="pill ${agg.allPriced ? 'pill--ok' : 'pill--plan'}">${agg.allPriced ? 'mit Preisen' : 'Preise teilweise'}</span>` : '<span class="pill pill--idea">ohne Preise</span>'}</div>
         ${agg.cost != null ? `<b class="big">${eur(agg.cost)}</b>` : ''}
-        <div class="mlist mlist--flat">${agg.lines.map(l => `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${esc(l.entries.join(', '))}</span></div>
+        <div class="mlist mlist--flat">${agg.lines.map(l => `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${Material.lineNote(l) ? esc(Material.lineNote(l)) + ' · ' : ''}${esc(l.entries.join(', '))}</span></div>
           <div class="mright"><span class="price">${l.continuous ? fmt(l.qty, 2) : l.qty} ${l.unit}</span>${l.cost != null ? `<span class="muted small mono">${eur(l.cost)}</span>` : ''}</div></div>`).join('')}</div>
         <button class="btn btn--ghost btn--sm" data-go="bestellung">In Bestellung ansehen</button>
       </div>` : '';
@@ -533,7 +533,7 @@
     for (const l of Material.aggregate(p.materials || []).lines) {
       if (!(l.qty > 0)) continue;
       const key = 'mat|' + l.key;
-      lines.push({ key, mat: true, label: l.label, qty: l.qty, unit: l.unit, continuous: l.continuous, entries: l.entries, cost: l.cost, status: (p.orders || {})[key] || 'offen' });
+      lines.push({ key, mat: true, label: l.label, note: Material.lineNote(l), qty: l.qty, unit: l.unit, continuous: l.continuous, entries: l.entries, cost: l.cost, status: (p.orders || {})[key] || 'offen' });
     }
     return lines;
   }
@@ -561,7 +561,7 @@
     if (mat.length) {
       t += '\nMaterial:\n';
       for (const l of mat) {
-        t += `- ${matQty(l)} ${l.label}${l.entries.length ? ` (für: ${l.entries.join(', ')})` : ''}\n`;
+        t += `- ${matQty(l)} ${l.label}${l.note ? ` (${l.note})` : ''}${l.entries.length ? ` (für: ${l.entries.join(', ')})` : ''}\n`;
         if (l.cost == null) allPriced = false; else cost += l.cost;
       }
     }
@@ -589,7 +589,7 @@
       const sel = `<select class="st ${l.status}" data-act="order-status" data-key="${esc(l.key)}" aria-label="Status">
         ${STATUSES.map(s => `<option value="${s}" ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
       if (l.tooLong) return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="warn-ink">Sonderlänge ${l.tooLong.map(x => fmt(x.length)).join(', ')} cm</span></div><div class="mright"><span class="price">–</span>${sel}</div></div>`;
-      if (l.mat) return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${matQty(l)} · ${esc(l.entries.join(', '))}</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : matQty(l)}</span>${sel}</div></div>`;
+      if (l.mat) return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${matQty(l)}${l.note ? ` (${esc(l.note)})` : ''} · ${esc(l.entries.join(', '))}</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : matQty(l)}</span>${sel}</div></div>`;
       return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${l.count} × ${fmt(l.stockLength / 100, 2)} m · ${fmt(l.count * l.stockLength / 100, 2)} lfm</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : l.count + ' Stk'}</span>${sel}</div></div>`;
     };
     const wood = shown.filter(l => !l.mat), mat = shown.filter(l => l.mat);

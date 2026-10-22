@@ -1,5 +1,5 @@
 // Cache-Version bei jedem Release erhöhen, damit Handys die neue Version laden.
-const CACHE = 'bauplaner-v4';
+const CACHE = 'bauplaner-v5';
 const ASSETS = [
   './', './index.html', './css/styles.css', './js/optimizer.js', './js/calcs.js', './js/material.js', './js/app.js',
   './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',

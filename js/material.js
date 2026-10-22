@@ -154,6 +154,9 @@
       const r = entryResult(e);
       for (const l of r.lines) {
         if (!map.has(l.key)) map.set(l.key, { key: l.key, label: l.label, unit: l.unit, exact: 0, continuous: !!l.continuous, unitPrice: l.unitPrice, entries: [] });
+        if (l.m2PerUnit) map.get(l.key).m2PerUnit = l.m2PerUnit;
+        if (l.perPallet) map.get(l.key).perPallet = l.perPallet;
+        if (l.lfm) map.get(l.key).lfm = (map.get(l.key).lfm || 0) + l.lfm;
         const m = map.get(l.key);
         m.exact += l.exact; m.entries.push(e.name || '');
         if (m.unitPrice == null && l.unitPrice != null) m.unitPrice = l.unitPrice;
@@ -168,7 +171,16 @@
     return { lines, cost: anyCost ? cost : null, allPriced: allPriced && lines.length > 0 };
   }
 
+  /** Zusatz zu Stück-Positionen, z. B. „≈ 9,0 m² · 1 Palette à 480 Stk“ (Pflaster/Platten). */
+  function lineNote(l) {
+    const parts = [];
+    if (l.m2PerUnit && l.qty > 0) parts.push(`≈ ${(Math.round(l.qty * l.m2PerUnit * 10) / 10).toLocaleString('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} m²`);
+    if (l.perPallet && l.qty > 0) { const n = ceilBags(l.qty / l.perPallet); parts.push(`${n} Palette${n === 1 ? '' : 'n'} à ${Math.round(l.perPallet)} Stk`); }
+    if (l.lfm > 0) parts.push(`${(Math.round(l.lfm * 10) / 10).toLocaleString('de-DE', { maximumFractionDigits: 1 })} lfm Bedarf`);
+    return parts.join(' · ');
+  }
+
   function fmtNum(x) { return String(Math.round(x * 100) / 100).replace('.', ','); }
 
-  return { BETON_BAGS, MIX_DEFAULTS, PUTZ_TYPES, DEFAULT_ZUSCHLAG, betonVolume, betonResult, putzArea, putzResult, entryResult, aggregate };
+  return { BETON_BAGS, MIX_DEFAULTS, PUTZ_TYPES, DEFAULT_ZUSCHLAG, betonVolume, betonResult, putzArea, putzResult, entryResult, aggregate, lineNote };
 });

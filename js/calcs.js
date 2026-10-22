@@ -51,6 +51,18 @@
  *  - Decke: Tragprofil CD Achsabstand 50 cm (Knauf D112 für 12,5 mm, quer montiert), UD umlaufend; Abhänger/
  *    Grundprofile sind nicht enthalten (Unterkonstruktion nach Systemblatt planen)
  *
+ *  - Holz-Unterkonstruktion: max. Achsabstände der UK für 12,5 mm Gipsplatten nach DIN 18181 (Tab. 2):
+ *    Wand 625 mm; Decke 500 mm bei Platten quer zur UK (420 mm längs). Holzständerwand Knauf W111 (Kantholz ≥ 60×60,
+ *    Achse 625 mm, Schwelle oben/unten) – Knauf W11.de Technische Information
+ *    https://knauf.com/de-DE/p/system/w11-de-metall-und-holzstaenderwaende
+ *    Holzdecke Knauf D111 (Traglatte quer, Achse 500 mm; Grund- + Traglatte ≥ 50×30, Achse Grundlatte 500–1200 mm je
+ *    Abhängerabstand, z. B. 800 mm → Abhänger 1050 mm bei ≤ 0,15 kN/m²; Grund-/Traglatte mit TN 4,3×55 verschraubt)
+ *    https://media.knauf.com/a/LKcHZoUu79sMenFwmpe4G5 (D11.ch Technische Information); Vorgabe Grundlatte 80 cm.
+ *  - Schrauben: Feingewinde TN 3,5×25/35 für Metall-UK bis 0,7 mm, Grobgewinde TN 3,9×35/45/55 für Holz-UK; Eindringtiefe
+ *    Metall ≥ 10 mm, Holz ≥ 19 mm (Knauf DIY „Montage- und Befestigungstechnik“; toom/Knauf Datenblatt Schnellbauschrauben,
+ *    Grobgewinde 250 Stk/Pck) https://knauf.com/de-DE/kunden-gruppe/diy/anleitungen/trockenbau-basiswissen/montage-und-befestigungstechnik
+ *  - Befestigung UK (Dübel/Schrauben je m Anschluss) ohne Vorgabe; Knauf: Anschlussprofile mit Abstand ≤ 1 m befestigen
+ *
  * DÄMMUNG – Packungsinhalt (m²/Paket) steht auf dem Etikett; Vorgabe 5 m² ist nur ein Platzhalter. Verschnitt 5 %
  *    (https://www.hanitools.de/trockenbau-rechner: „Wandfläche + 5 % Verschnitt“).
  *
@@ -68,7 +80,11 @@
  * PFLASTER
  *  - Bettung Splitt 0/5, 4 cm im verdichteten Zustand (DIN 18318; Lithonplus Verlegehinweise)
  *    https://www.lithon.de/mein-zuhause/service/verlegehinweise/pflastersteine-verlegen
- *  - Fugensand ca. 5 kg/m² (≈ 5,6 kg/m² bei 20×10 cm, 3 mm Fuge, 8 cm Steinhöhe – https://rechner-werk.de/pflasterfugen-rechner/)
+ *  - Fugensand ca. 5 kg/m² (≈ 5,6 kg/m² bei 20×10 cm, 3 mm Fuge, 8 cm Steinhöhe – https://rechner-werk.de/pflasterfugen-rechner/);
+ *    ohne Eingabe automatisch: (A + B) / (A × B) × Fuge × Höhe × 1,55 kg/l (A, B, Fuge, Höhe in mm)
+ *  - Steine/Platten je m² = 1 / ((L + Fuge) × (B + Fuge)); Fugenbreite Pflaster 3–5 mm nach DIN 18318 → Vorgabe 4 mm.
+ *    Verbundpflaster/Mehrsteinsysteme: St./m² laut Hersteller eintragen (überschreibt die Formel).
+ *  - Paletten: m²/Palette oder St./Palette laut Hersteller (Datenblatt), keine Vorgabe
  *
  * DACH
  *  - Trapezblech: 6–8 Befestigungsschrauben/m² + 2–3 Überlappungsschrauben/m² → Vorgabe 8/m²
@@ -139,6 +155,44 @@
   // ---------- field helpers for the generic editor ----------
   const num = (k, label, unit, extra = {}) => ({ t: 'num', f: k, label, unit, ...extra });
   const row = (...items) => ({ t: 'row', items });
+  // Holz-UK: Stückzahl bei Lieferlänge S für `rows` Läufe der Länge X. Passt X in S, werden mehrere Läufe aus einer
+  // Stange geschnitten (floor(S/X) je Stange); längere Läufe werden gestoßen (Stoß auf Unterkonstruktion) mit
+  // 10 % Zuschlag für Stoß/Verschnitt (Annahme).
+  const WOOD_JOIN_WASTE = 0.10;
+  function woodPieces(rows, X, S) {
+    if (!(rows > 0) || !(X > 0) || !(S > 0)) return 0;
+    if (X <= S + 1e-9) return ceilN(rows / Math.floor(S / X + 1e-9));
+    return ceilN(rows * X * (1 + WOOD_JOIN_WASTE) / S);
+  }
+  // Pflaster/Platten-Formate (L × B × D in cm, Fuge in mm). Fuge Pflaster 3–5 mm (DIN 18318), Platten 3–5 mm
+  // (Fugenkreuze); Vorgabe 4 mm. Werte sind Nennmaße, Hersteller-St./m² können abweichen.
+  const PAVERS = [
+    { id: 'rp-20x10', label: 'Rechteckpflaster 20×10×8', product: 'Rechteckpflaster', l: 20, w: 10, t: 8, fuge: 4 },
+    { id: 'rp-24x16', label: 'Rechteckpflaster 24×16×8', product: 'Rechteckpflaster', l: 24, w: 16, t: 8, fuge: 4 },
+    { id: 'qp-14x14', label: 'Quadratpflaster 14×14×8', product: 'Quadratpflaster', l: 14, w: 14, t: 8, fuge: 4 },
+    { id: 'qp-20x20', label: 'Quadratpflaster 20×20×8', product: 'Quadratpflaster', l: 20, w: 20, t: 8, fuge: 4 },
+    { id: 'tp-40x40', label: 'Terrassenplatte 40×40×4', product: 'Terrassenplatte', l: 40, w: 40, t: 4, fuge: 4 },
+    { id: 'tp-50x50', label: 'Terrassenplatte 50×50×5', product: 'Terrassenplatte', l: 50, w: 50, t: 5, fuge: 4 },
+    { id: 'tp-60x30', label: 'Terrassenplatte 60×30×4', product: 'Terrassenplatte', l: 60, w: 30, t: 4, fuge: 4 },
+    { id: 'tp-60x60', label: 'Terrassenplatte 60×60×4', product: 'Terrassenplatte', l: 60, w: 60, t: 4, fuge: 4 },
+    { id: 'tp-80x40', label: 'Terrassenplatte 80×40×4', product: 'Terrassenplatte', l: 80, w: 40, t: 4, fuge: 4 },
+    { id: 'tp-100x50', label: 'Terrassenplatte 100×50×4', product: 'Terrassenplatte', l: 100, w: 50, t: 4, fuge: 4 }
+  ];
+  // Fugensand kg/m² = (A + B) / (A × B) × Fugenbreite × Steinhöhe × 1,55 kg/l (A, B, Fuge, Höhe in mm) –
+  // gleiche Formel wie Fugenmörtel; ergibt 5,6 kg/m² bei 20×10×8 cm, 3 mm (vgl. rechner-werk.de Pflasterfugen-Rechner)
+  const SAND_DENSITY = 1.55;
+  function paverGeom(e) {
+    const L = pos(e.fmtL), W = pos(e.fmtW), T = pos(e.fmtT), fu = pos(e.fuge);
+    const manual = pos(e.perM2) > 0;
+    const hasSize = L > 0 && W > 0;
+    const perM2 = manual ? pos(e.perM2) : hasSize ? 1 / ((L / 100 + fu / 1000) * (W / 100 + fu / 1000)) : 0;
+    const prod = (e.product || 'Pflaster').trim();
+    const size = hasSize ? `${f(L, 1)}×${f(W, 1)}${T > 0 ? '×' + f(T, 1) : ''} cm` : '';
+    const label = size && !prod.includes(size.replace(' cm', '')) ? `${prod} ${size}` : prod;
+    const key = hasSize ? `${prod}|${L}x${W}x${T}|${manual ? 'm' + pos(e.perM2) : 'f' + fu}` : `${prod}|m${pos(e.perM2)}`;
+    const sandAuto = hasSize && fu > 0 ? (L * 10 + W * 10) / (L * 10 * W * 10) * fu * (T > 0 ? T * 10 : 80) * SAND_DENSITY : null;
+    return { perM2, manual, label, key, sandAuto };
+  }
   const priceRow = (...items) => ({ t: 'row', items: items.map(([k, label, unit]) => num(k, label, unit, { ph: '–' })), price: true });
   const areaFields = (second, secondLabel, withOpenings) => [
     { t: 'seg', f: 'mode', opts: [['mass', withOpenings ? `L × ${secondLabel[0]} − Öffnungen` : `Länge × ${secondLabel}`], ['direkt', 'Fläche direkt']] },
@@ -255,62 +309,133 @@
       }
     },
     trockenbau: {
-      cat: 'ausbau', label: 'Trockenbau', sub: 'GK-Platten, Profile', ph: 'z. B. Trennwand Büro',
-      defaults: () => ({ mode: 'wand', length: '', height: '', width: '', sides: 2, layers: 1, plate: '2000', plateW: 1.25, plateL: 2.0, waste: 10,
-        cwAxis: 62.5, cwLen: 2.6, uwLen: 3, cdAxis: 50, cdLen: 4, udLen: 3, screwsPerM2: 15, screwPack: 1000, spachtelKgPerM2: 0.25, spachtelBagKg: 5,
-        bandMPerM2: 0.75, bandRoll: 50, platePrice: '', profilePrice: '', screwPackPrice: '', spachtelBagPrice: '', bandRollPrice: '' }),
-      fields: () => [
-        { t: 'seg', f: 'mode', opts: [['wand', 'Ständerwand'], ['decke', 'Decke']] },
-        row(num('length', 'Länge', 'm'), num('height', 'Höhe', 'm', { show: d => d.mode !== 'decke' }), num('width', 'Breite', 'm', { show: d => d.mode === 'decke' })),
-        row(num('sides', 'Seiten', '', { show: d => d.mode !== 'decke', inputmode: 'numeric' }), num('layers', 'Lagen', '', { inputmode: 'numeric' }), num('waste', 'Verschnitt', '%')),
-        { t: 'select', f: 'plate', label: 'Gipskartonplatte 12,5 mm', opts: [['2000', '1250 × 2000 mm (2,5 m²)'], ['2600', '1250 × 2600 mm (3,25 m²)'], ['eigen', 'Eigenes Maß']] },
-        row(num('plateW', 'Platte B', 'm'), num('plateL', 'L', 'm')),
-        row(num('cwAxis', 'CW-Achse', 'cm', { show: d => d.mode !== 'decke' }), num('cwLen', 'CW-Länge', 'm', { show: d => d.mode !== 'decke' }), num('uwLen', 'UW-Länge', 'm', { show: d => d.mode !== 'decke' }),
-          num('cdAxis', 'CD-Achse', 'cm', { show: d => d.mode === 'decke' }), num('cdLen', 'CD-Länge', 'm', { show: d => d.mode === 'decke' }), num('udLen', 'UD-Länge', 'm', { show: d => d.mode === 'decke' })),
-        row(num('screwsPerM2', 'Schrauben', 'St./m²'), num('screwPack', 'Paket', 'Stk')),
-        row(num('spachtelKgPerM2', 'Spachtel', 'kg/m²'), num('spachtelBagKg', 'Sack', 'kg')),
-        row(num('bandMPerM2', 'Fugenband', 'm/m²'), num('bandRoll', 'Rolle', 'm')),
-        { t: 'note', text: d => d.mode === 'decke' ? 'Decke: CD-Tragprofile + UD umlaufend; Abhänger und Grundprofile nach Knauf-Systemblatt ergänzen.' : 'Knauf W111: CW alle 62,5 cm + Endständer, UW oben und unten. Spachtel/Fugenband je m² und Seite.' },
-        priceRow(['platePrice', 'Platte', '€'], ['profilePrice', 'Profil', '€/Stk'], ['screwPackPrice', 'Schr./Pck', '€']),
-        priceRow(['spachtelBagPrice', 'Spachtel', '€/Sack'], ['bandRollPrice', 'Band', '€/Rolle'])
-      ],
+      cat: 'ausbau', label: 'Trockenbau', sub: 'GK-Platten, Metall- oder Holz-UK', ph: 'z. B. Trennwand Büro',
+      defaults: () => ({ mode: 'wand', uk: 'metall', length: '', height: '', width: '', sides: 2, layers: 1, plate: '2000', plateW: 1.25, plateL: 2.0, waste: 10,
+        cwAxis: 62.5, cwLen: 2.6, uwLen: 3, cdAxis: 50, cdLen: 4, udLen: 3,
+        kantSec: '60x60', kantAxis: 62.5, kantLen: 5, lattSec: '24x48', lattAxis: 50, lattLen: 4, lattDouble: 'nein', grundSec: '30x50', grundAxis: 80, secCustom: '',
+        screwsPerM2: 15, screwPack: 1000, fixPerM: '', fixPack: 100, spachtelKgPerM2: 0.25, spachtelBagKg: 5,
+        bandMPerM2: 0.75, bandRoll: 50, platePrice: '', profilePrice: '', screwPackPrice: '', fixPackPrice: '', spachtelBagPrice: '', bandRollPrice: '' }),
+      fields: () => {
+        const holz = d => d.uk === 'holz', metall = d => d.uk !== 'holz', wand = d => d.mode !== 'decke', decke = d => d.mode === 'decke';
+        const secOpts = list => [...list.map(x => [x, x.replace('x', ' × ') + ' mm']), ['eigen', 'Eigener Querschnitt']];
+        return [
+          { t: 'seg', f: 'mode', opts: [['wand', 'Ständerwand'], ['decke', 'Decke']] },
+          row(num('length', 'Länge', 'm'), num('height', 'Höhe', 'm', { show: wand }), num('width', 'Breite', 'm', { show: decke })),
+          row(num('sides', 'Seiten', '', { show: wand, inputmode: 'numeric' }), num('layers', 'Lagen', '', { inputmode: 'numeric' }), num('waste', 'Verschnitt', '%')),
+          { t: 'select', f: 'plate', label: 'Gipskartonplatte 12,5 mm', opts: [['2000', '1250 × 2000 mm (2,5 m²)'], ['2600', '1250 × 2600 mm (3,25 m²)'], ['eigen', 'Eigenes Maß']] },
+          row(num('plateW', 'Platte B', 'm'), num('plateL', 'L', 'm')),
+          { t: 'lbl', text: 'Unterkonstruktion' },
+          { t: 'seg', f: 'uk', opts: [['metall', 'Metall (CW/UW/CD)'], ['holz', 'Holz']] },
+          row(num('cwAxis', 'CW-Achse', 'cm', { show: d => metall(d) && wand(d) }), num('cwLen', 'CW-Länge', 'm', { show: d => metall(d) && wand(d) }), num('uwLen', 'UW-Länge', 'm', { show: d => metall(d) && wand(d) }),
+            num('cdAxis', 'CD-Achse', 'cm', { show: d => metall(d) && decke(d) }), num('cdLen', 'CD-Länge', 'm', { show: d => metall(d) && decke(d) }), num('udLen', 'UD-Länge', 'm', { show: d => metall(d) && decke(d) })),
+          { t: 'select', f: 'kantSec', label: 'Kantholz (Ständer + Schwellen)', opts: secOpts(['60x60', '40x60', '60x80']), show: d => holz(d) && wand(d) },
+          { t: 'select', f: 'lattSec', label: 'Traglattung', opts: secOpts(['24x48', '30x50']), show: d => holz(d) && decke(d) },
+          { t: 'text', f: 'secCustom', label: 'Querschnitt (mm)', ph: 'z. B. 50x70', show: d => holz(d) && (wand(d) ? d.kantSec === 'eigen' : d.lattSec === 'eigen') },
+          row(num('kantAxis', 'Achsabstand', 'cm', { show: d => holz(d) && wand(d) }), num('kantLen', 'Lieferlänge', 'm', { show: d => holz(d) && wand(d) }),
+            num('lattAxis', 'Achsabstand', 'cm', { show: d => holz(d) && decke(d) }), num('lattLen', 'Lieferlänge', 'm', { show: d => holz(d) && decke(d) })),
+          { t: 'seg', f: 'lattDouble', opts: [['nein', 'Nur Traglattung'], ['ja', 'Grund- + Traglattung']], show: d => holz(d) && decke(d) },
+          { t: 'select', f: 'grundSec', label: 'Grundlattung', opts: [['30x50', '30 × 50 mm'], ['40x60', '40 × 60 mm'], ['24x48', '24 × 48 mm']], show: d => holz(d) && decke(d) && d.lattDouble === 'ja' },
+          row(num('grundAxis', 'Achse Grundlatte', 'cm', { show: d => holz(d) && decke(d) && d.lattDouble === 'ja' })),
+          row(num('screwsPerM2', 'Plattenschrauben', 'St./m²'), num('screwPack', 'Paket', 'Stk')),
+          row(num('fixPerM', 'Befestigung UK', 'St./m', { ph: 'opt.' }), num('fixPack', 'Paket', 'Stk')),
+          row(num('spachtelKgPerM2', 'Spachtel', 'kg/m²'), num('spachtelBagKg', 'Sack', 'kg')),
+          row(num('bandMPerM2', 'Fugenband', 'm/m²'), num('bandRoll', 'Rolle', 'm')),
+          { t: 'note', text: d => {
+            if (holz(d)) return decke(d) ? 'Holz-UK Decke (Knauf D111, DIN 18181): Traglatten quer zur Platte alle 50 cm (12,5 mm), Grundlatten nach Abhängerabstand. Schrauben mit Grobgewinde.'
+              : 'Holzständerwand (Knauf W111): Ständer alle 62,5 cm + Endständer, Schwelle oben und unten. Schrauben mit Grobgewinde.';
+            return decke(d) ? 'Decke: CD-Tragprofile + UD umlaufend; Abhänger und Grundprofile nach Knauf-Systemblatt ergänzen.' : 'Knauf W111: CW alle 62,5 cm + Endständer, UW oben und unten. Schrauben mit Feingewinde.';
+          } },
+          { t: 'note', text: () => 'Befestigung UK: Schrauben + Dübel je m Anschluss (Wand: Schwellen/UW + Randständer; Decke: UD bzw. direkt befestigte Latten), z. B. 1,5 St./m (Abstand ≤ 1 m bzw. nach Abhängerabstand).' },
+          priceRow(['platePrice', 'Platte', '€'], ['profilePrice', 'Profil/Holz', '€/Stk'], ['screwPackPrice', 'Schr./Pck', '€']),
+          priceRow(['fixPackPrice', 'Dübel/Pck', '€'], ['spachtelBagPrice', 'Spachtel', '€/Sack'], ['bandRollPrice', 'Band', '€/Rolle'])
+        ];
+      },
       onSelect(d, k, v) { if (k === 'plate' && v !== 'eigen') { d.plateW = 1.25; d.plateL = v === '2600' ? 2.6 : 2.0; } },
-      describe: e => e.mode === 'decke' ? `Decke ${f(pos(e.length))} × ${f(pos(e.width))} m · ${pos(e.layers) || 1}-lagig`
-        : `Wand ${f(pos(e.length))} × ${f(pos(e.height))} m · ${pos(e.sides) || 1} Seite(n), ${pos(e.layers) || 1}-lagig`,
+      onSet(d, k, v) { if (k === 'uk') d.screwPack = v === 'holz' ? 250 : 1000; },
+      describe: e => (e.mode === 'decke' ? `Decke ${f(pos(e.length))} × ${f(pos(e.width))} m · ${pos(e.layers) || 1}-lagig`
+        : `Wand ${f(pos(e.length))} × ${f(pos(e.height))} m · ${pos(e.sides) || 1} Seite(n), ${pos(e.layers) || 1}-lagig`) + (e.uk === 'holz' ? ' · Holz-UK' : ''),
       compute(e) {
-        const decke = e.mode === 'decke', L = pos(e.length), H = decke ? pos(e.width) : pos(e.height);
+        const decke = e.mode === 'decke', holz = e.uk === 'holz', L = pos(e.length), H = decke ? pos(e.width) : pos(e.height);
         const A = L * H, sides = decke ? 1 : Math.max(1, Math.round(pos(e.sides) || 1)), layers = Math.max(1, Math.round(pos(e.layers) || 1));
         const w = pct(e.waste, 10) / 100, pw = pos(e.plateW) || 1.25, pl = pos(e.plateL) || 2;
         const board = A * sides * layers, platesExact = board * (1 + w) / (pw * pl);
         const r = { area: A, board, plates: ceilN(platesExact), lines: [], info: [] };
         const pp = price(e.profilePrice);
         r.lines.push(line(`gk|${Math.round(pw * 1000)}x${Math.round(pl * 1000)}`, `Gipskartonplatte 12,5 mm ${Math.round(pw * 1000)}×${Math.round(pl * 1000)}`, 'Stk', platesExact, price(e.platePrice)));
-        if (!decke) {
+        let fixM = 0;
+        if (holz) {
+          const secOf = v => (v === 'eigen' ? String(e.secCustom || '').trim() || 'Holz' : String(v || '')).replace(/\s*[x×]\s*/g, '×');
+          if (!decke) {
+            const axis = (pos(e.kantAxis) || 62.5) / 100, S = pos(e.kantLen) || 5, sec = secOf(e.kantSec || '60x60');
+            const studs = L > 0 && H > 0 ? ceilN(L / axis) + 1 : 0;
+            const pStuds = woodPieces(studs, H, S), pPlates = woodPieces(L > 0 && H > 0 ? 2 : 0, L, S);
+            Object.assign(r, { studs, woodM: studs * H + 2 * L, woodPcs: pStuds + pPlates, woodSec: sec, woodLen: S });
+            r.lines.push(Object.assign(line(`kantholz|${sec}|${S}`, `Kantholz ${sec} mm, ${f(S)} m`, 'Stk', r.woodPcs, pp), { lfm: r.woodM }));
+            r.info.push(`${studs} Ständer à ${f(H)} m + Schwellen 2 × ${f(L)} m = ${f(r.woodM, 1)} lfm → ${r.woodPcs} Stk à ${f(S)} m`);
+            fixM = 2 * L + 2 * H;
+          } else {
+            const axis = (pos(e.lattAxis) || 50) / 100, S = pos(e.lattLen) || 4, sec = secOf(e.lattSec || '24x48');
+            const rows = L > 0 && H > 0 ? ceilN(H / axis) + 1 : 0;
+            const pcs = woodPieces(rows, L, S);
+            Object.assign(r, { lattRows: rows, woodM: rows * L, woodPcs: pcs, woodSec: sec, woodLen: S });
+            r.lines.push(Object.assign(line(`latte|${sec}|${S}`, `Latte ${sec} mm, ${f(S)} m`, 'Stk', pcs, pp), { lfm: r.woodM }));
+            r.info.push(`Traglattung: ${rows} Reihen à ${f(L)} m (Achse ${f(axis * 100, 1)} cm) = ${f(r.woodM, 1)} lfm → ${pcs} Stk à ${f(S)} m`);
+            fixM = r.woodM;
+            if (e.lattDouble === 'ja') {
+              const ga = (pos(e.grundAxis) || 80) / 100, gsec = secOf(e.grundSec || '30x50');
+              const grows = L > 0 && H > 0 ? ceilN(L / ga) + 1 : 0, gpcs = woodPieces(grows, H, S);
+              Object.assign(r, { grundRows: grows, grundM: grows * H, grundPcs: gpcs, crossings: rows * grows });
+              const gKey = `latte|${gsec}|${S}`, same = r.lines.findIndex(l => l.key === gKey);
+              if (same >= 0) r.lines[same] = Object.assign(line(gKey, r.lines[same].label, 'Stk', pcs + gpcs, pp), { lfm: r.woodM + r.grundM });
+              else r.lines.push(Object.assign(line(gKey, `Latte ${gsec} mm, ${f(S)} m`, 'Stk', gpcs, pp), { lfm: r.grundM }));
+              r.info.push(`Grundlattung: ${grows} Reihen à ${f(H)} m (Achse ${f(ga * 100, 0)} cm) = ${f(r.grundM, 1)} lfm → ${gpcs} Stk ${gsec} mm`);
+              r.lines.push(line('holzschraube|4,3x55|100', 'Holzbauschrauben 4,3×55 (100 Stk, Grund-/Traglatte)', 'Pck', r.crossings / 100, null));
+              r.info.push(`${r.crossings} Kreuzungspunkte Grund-/Traglatte → je 1 Schraube 4,3×55`);
+              fixM = r.grundM;
+            }
+          }
+        } else if (!decke) {
           const axis = (pos(e.cwAxis) || 62.5) / 100, cwLen = pos(e.cwLen) || 2.6, uwLen = pos(e.uwLen) || 3;
           const studs = L > 0 ? ceilN(L / axis) + 1 : 0;
           r.studs = studs; r.cw = studs * ceilN(H / cwLen); r.uw = ceilN(2 * L / uwLen);
           r.lines.push(line(`cw|${cwLen}`, `CW-Profil ${f(cwLen)} m`, 'Stk', r.cw, pp));
           r.lines.push(line(`uw|${uwLen}`, `UW-Profil ${f(uwLen)} m`, 'Stk', r.uw, pp));
           r.info.push(`${studs} Ständer (Achse ${f(axis * 100, 1)} cm) → ${r.cw} CW à ${f(cwLen)} m · UW ${f(2 * L)} m → ${r.uw} Stk`);
+          fixM = 2 * L + 2 * H;
         } else {
           const axis = (pos(e.cdAxis) || 50) / 100, cdLen = pos(e.cdLen) || 4, udLen = pos(e.udLen) || 3;
           const cdM = A / axis; r.cd = ceilN(cdM * (1 + w) / cdLen); r.ud = ceilN(2 * (L + H) / udLen);
           r.lines.push(line(`cd|${cdLen}`, `CD-Profil ${f(cdLen)} m`, 'Stk', r.cd, pp));
           r.lines.push(line(`ud|${udLen}`, `UD-Profil ${f(udLen)} m`, 'Stk', r.ud, pp));
           r.info.push(`CD ${f(cdM, 1)} m (Achse ${f(axis * 100, 0)} cm) → ${r.cd} Stk · UD ${f(2 * (L + H))} m → ${r.ud} Stk`);
+          fixM = 2 * (L + H);
         }
-        const sp = pos(e.screwPack) || 1000;
+        const sp = pos(e.screwPack) || (holz ? 250 : 1000);
         r.screws = Math.round(board * pos(e.screwsPerM2));
-        r.lines.push(line(`tn|${sp}`, `Schnellbauschrauben TN 3,5×25 (${f(sp, 0)} Stk)`, 'Pck', r.screws / sp, price(e.screwPackPrice)));
+        // Schraubenlänge: Beplankung + Eindringtiefe (Metall ≥ 10 mm, Holz ≥ 19 mm, Knauf) → Metall 25/35, Holz 35/45
+        if (holz) {
+          const len = layers > 1 ? 45 : 35; r.screwType = `Grobgewinde 3,9×${len}`;
+          r.lines.push(line(`tn-grob|${len}|${sp}`, `Schnellbauschrauben Grobgewinde 3,9×${len} (Holz, ${f(sp, 0)} Stk)`, 'Pck', r.screws / sp, price(e.screwPackPrice)));
+        } else {
+          const len = layers > 1 ? 35 : 25; r.screwType = `Feingewinde 3,5×${len}`;
+          r.lines.push(line(len === 25 ? `tn|${sp}` : `tn${len}|${sp}`, `Schnellbauschrauben Feingewinde 3,5×${len} (Metall, ${f(sp, 0)} Stk)`, 'Pck', r.screws / sp, price(e.screwPackPrice)));
+        }
+        if (pos(e.fixPerM) > 0 && fixM > 0) {
+          const fp = pos(e.fixPack) || 100;
+          r.fixM = fixM; r.fix = ceilN(fixM * pos(e.fixPerM));
+          r.lines.push(line(`ukfix|${fp}`, `Befestigung UK: Schrauben + Dübel (${f(fp, 0)} Stk)`, 'Pck', r.fix / fp, price(e.fixPackPrice)));
+          r.info.push(`Befestigung UK: ${f(fixM, 1)} m × ${f(pos(e.fixPerM), 1)} St./m = ${r.fix} Schrauben + Dübel`);
+        }
         const sb = pos(e.spachtelBagKg) || 5;
         r.spachtelKg = A * sides * pos(e.spachtelKgPerM2) * (layers > 1 ? 1.6 : 1);
         r.lines.push(line(`spachtel|${sb}`, `Fugenspachtel ${f(sb)} kg`, 'Sack', r.spachtelKg / sb, price(e.spachtelBagPrice)));
         const roll = pos(e.bandRoll) || 50;
         r.bandM = A * sides * pos(e.bandMPerM2);
         r.lines.push(line(`fugenband|${roll}`, `Fugendeckstreifen ${f(roll, 0)} m`, 'Rolle', r.bandM / roll, price(e.bandRollPrice)));
-        r.info.push(`Schrauben ≈ ${r.screws} · Spachtel ${f(r.spachtelKg, 1)} kg · Fugenband ${f(r.bandM, 1)} m`);
+        r.info.push(`Plattenschrauben ${r.screwType} ≈ ${r.screws} · Spachtel ${f(r.spachtelKg, 1)} kg · Fugenband ${f(r.bandM, 1)} m`);
         r.big = `${r.plates} Platten`; r.sub = `${f(board)} m² Beplankung + ${f(w * 100, 0)} %`;
-        r.side = decke ? { n: r.cd, label: `CD à ${f(pos(e.cdLen) || 4)} m` } : { n: r.cw, label: `CW à ${f(pos(e.cwLen) || 2.6)} m` };
+        if (holz) r.side = { n: r.woodPcs + (r.grundPcs || 0), label: decke ? `Latten à ${f(r.woodLen)} m` : `Kantholz à ${f(r.woodLen)} m`, small: `${f(r.woodM + (r.grundM || 0), 1)} lfm` };
+        else r.side = decke ? { n: r.cd, label: `CD à ${f(pos(e.cdLen) || 4)} m` } : { n: r.cw, label: `CW à ${f(pos(e.cwLen) || 2.6)} m` };
         return finish(r);
       }
     },
@@ -386,33 +511,62 @@
       }
     },
     pflaster: {
-      cat: 'aussen', label: 'Pflaster / Platten', sub: 'm², Bettung, Fugensand', ph: 'z. B. Einfahrt',
-      defaults: () => ({ ...areaDefaults('width'), product: 'Pflaster 20×10×8', waste: 5, bettungCm: 4, bettungComp: 20, bettungDensity: 1.5, sandKgPerM2: 5, sandBagKg: 25,
-        m2Price: '', splittPricePerT: '', sandBagPrice: '' }),
+      cat: 'aussen', label: 'Pflaster / Platten', sub: 'Steine/Platten, Bettung, Fugensand', ph: 'z. B. Einfahrt',
+      defaults: () => ({ ...areaDefaults('width'), format: 'rp-20x10', product: 'Rechteckpflaster', fmtL: 20, fmtW: 10, fmtT: 8, fuge: 4, perM2: '',
+        waste: 5, palletM2: '', palletStk: '', bettungCm: 4, bettungComp: 20, bettungDensity: 1.5, sandKgPerM2: '', sandBagKg: 25,
+        piecePrice: '', m2Price: '', splittPricePerT: '', sandBagPrice: '' }),
       fields: () => [
         ...areaFields('width', 'Breite', false),
-        { t: 'text', f: 'product', label: 'Stein / Platte', ph: 'z. B. Betonpflaster 20×10×8' },
-        row(num('waste', 'Verschnitt', '%')),
+        { t: 'select', f: 'format', label: 'Format', opts: [...PAVERS.map(x => [x.id, x.label]), ['eigen', 'Eigenes Format / Herstellerwert']] },
+        { t: 'text', f: 'product', label: 'Bezeichnung Stein / Platte', ph: 'z. B. Betonpflaster grau' },
+        row(num('fmtL', 'Länge', 'cm'), num('fmtW', 'Breite', 'cm'), num('fmtT', 'Dicke', 'cm', { ph: 'opt.' })),
+        row(num('fuge', 'Fuge', 'mm'), num('perM2', 'oder St./m²', 'St.', { ph: 'Hersteller' })),
+        { t: 'note', text: d => pos(d.perM2) > 0 ? 'St./m² vom Hersteller ist eingetragen und ersetzt die Berechnung aus dem Format (z. B. Verbundpflaster, Mehrsteinsystem).'
+          : 'Steine/m² = 1 ÷ ((Länge + Fuge) × (Breite + Fuge)). Für Verbundpflaster/Mehrsteinsysteme den Herstellerwert bei „St./m²“ eintragen.' },
+        row(num('waste', 'Verschnitt', '%'), num('palletM2', 'Palette', 'm²', { ph: 'opt.' }), num('palletStk', 'oder', 'St./Pal.', { ph: 'opt.' })),
         { t: 'lbl', text: 'Bettung Splitt 0/5' },
         row(num('bettungCm', 'Dicke verd.', 'cm'), num('bettungComp', 'Verdichtung', '%'), num('bettungDensity', 'Dichte', 't/m³')),
-        row(num('sandKgPerM2', 'Fugensand', 'kg/m²'), num('sandBagKg', 'Sack', 'kg')),
-        { t: 'note', text: () => 'DIN 18318: Bettung ca. 4 cm verdichtet (3–5 cm). Fugensand je nach Format/Fuge 1,5–6 kg/m².' },
-        priceRow(['m2Price', 'Pflaster', '€/m²'], ['splittPricePerT', 'Splitt', '€/t'], ['sandBagPrice', 'Sand', '€/Sack'])
+        row(num('sandKgPerM2', 'Fugensand', 'kg/m²', { ph: 'auto' }), num('sandBagKg', 'Sack', 'kg')),
+        { t: 'note', text: () => 'DIN 18318: Bettung ca. 4 cm verdichtet (3–5 cm). Fugensand leer = automatisch aus Format, Fuge und Dicke.' },
+        priceRow(['piecePrice', 'Preis', '€/Stk'], ['m2Price', 'oder', '€/m²']),
+        priceRow(['splittPricePerT', 'Splitt', '€/t'], ['sandBagPrice', 'Sand', '€/Sack'])
       ],
-      describe: e => `${areaText(e, area(e))} · ${e.product || 'Pflaster'}`,
+      onSelect(d, k, v) {
+        if (k !== 'format') return;
+        const x = PAVERS.find(p => p.id === v);
+        if (x) Object.assign(d, { product: x.product, fmtL: x.l, fmtW: x.w, fmtT: x.t, fuge: x.fuge, perM2: '' });
+      },
+      describe: e => { const g = paverGeom(e); return `${areaText(e, area(e))} · ${g.label}`; },
       compute(e) {
         const a = area(e), w = pct(e.waste, 5) / 100;
         const m2 = a.net * (1 + w);
+        const g = paverGeom(e);
         const splittM3 = a.net * pos(e.bettungCm) / 100 * (1 + pct(e.bettungComp, 20) / 100), splittT = splittM3 * pos(e.bettungDensity);
-        const sb = pos(e.sandBagKg) || 25, sandKg = a.net * pos(e.sandKgPerM2);
-        const prod = (e.product || 'Pflaster').trim();
-        const r = { net: a.net, m2, splittM3, splittT, sandKg, sandBags: ceilN(sandKg / sb), lines: [], info: [] };
-        r.lines.push(line(`pflaster|${prod}`, prod, 'm²', Math.ceil(m2 * 10 - 1e-9) / 10, price(e.m2Price), true));
+        const sandAuto = e.sandKgPerM2 === '' || e.sandKgPerM2 == null;
+        const sandPerM2 = sandAuto ? (g.sandAuto ?? 5) : pos(e.sandKgPerM2);
+        const sb = pos(e.sandBagKg) || 25, sandKg = a.net * sandPerM2;
+        const r = { net: a.net, m2, splittM3, splittT, sandKg, sandPerM2, sandBags: ceilN(sandKg / sb), perM2: g.perM2, lines: [], info: [] };
+        const pp = price(e.piecePrice), mp = price(e.m2Price);
+        if (g.perM2 > 0) {
+          const pieces = ceilN(m2 * g.perM2);
+          const perPallet = pos(e.palletStk) > 0 ? pos(e.palletStk) : pos(e.palletM2) > 0 ? pos(e.palletM2) * g.perM2 : 0;
+          Object.assign(r, { pieces, perPallet, pallets: perPallet ? ceilN(pieces / perPallet) : 0 });
+          const unitPrice = pp != null ? pp : mp != null ? mp / g.perM2 : null;
+          const l = line(`pflaster-stk|${g.key}`, g.label, 'Stk', m2 * g.perM2, unitPrice);
+          l.m2PerUnit = 1 / g.perM2; if (perPallet) l.perPallet = perPallet;
+          r.lines.push(l);
+          r.big = `${pieces.toLocaleString('de-DE')} Stk`;
+          r.sub = `${f(a.net)} m² + ${f(w * 100, 0)} % = ${f(m2)} m² × ${f(g.perM2, 2)} St./m²${g.manual ? ' (Hersteller)' : ''}`;
+          r.info.push(`${g.label}: ${pieces.toLocaleString('de-DE')} Stk ≈ ${f(pieces / g.perM2, 1)} m²`);
+          if (perPallet) r.info.push(`Paletten: ${r.pallets} × ${f(perPallet, 0)} Stk${pos(e.palletStk) > 0 ? '' : ` (${f(pos(e.palletM2))} m²)`}`);
+        } else {
+          r.lines.push(line(`pflaster|${g.label}`, g.label, 'm²', Math.ceil(m2 * 10 - 1e-9) / 10, mp, true));
+          r.big = `${f(m2)} m²`; r.sub = `${f(a.net)} m² + ${f(w * 100, 0)} % Verschnitt`;
+        }
         r.lines.push(line('schutt|Splitt 0/5 (Bettung)', 'Splitt 0/5 (Bettung)', 't', splittT, price(e.splittPricePerT), true));
         r.lines.push(line(`fugensand|${sb}`, `Fugensand ${f(sb)} kg`, 'Sack', sandKg / sb, price(e.sandBagPrice)));
-        r.big = `${f(m2)} m²`; r.sub = `${f(a.net)} m² + ${f(w * 100, 0)} % Verschnitt`;
         r.side = { n: f(splittT, 2), label: 't Splitt 0/5', small: `${f(splittM3, 2)} m³` };
-        r.info.push(`Fugensand ${f(sandKg, 0)} kg → ${r.sandBags} Sack à ${f(sb)} kg`);
+        r.info.push(`Fugensand ${f(sandPerM2, 1)} kg/m²${sandAuto && g.sandAuto != null ? ' (aus Format)' : ''} → ${f(sandKg, 0)} kg → ${r.sandBags} Sack à ${f(sb)} kg`);
         return finish(r);
       }
     },
@@ -489,5 +643,5 @@
   }
   function result(e) { const c = CALCS[e.kind]; return c ? c.compute(e) : { lines: [], info: [], cost: null, big: '–', sub: '' }; }
 
-  return { CALCS, CATEGORIES, STONES, ESTRICH_TYPES, ZAHNUNG, PAINTS, BULK, UNITS, area, result, numFields, fmt: f };
+  return { PAVERS, paverGeom, CALCS, CATEGORIES, STONES, ESTRICH_TYPES, ZAHNUNG, PAINTS, BULK, UNITS, area, result, numFields, fmt: f };
 });
