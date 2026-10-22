@@ -1,9 +1,9 @@
 // Cache-Version bei jedem Release erhöhen, damit Handys die neue Version laden.
-const CACHE = 'bauplaner-v5';
+const CACHE = 'bauplaner-v6';
 const ASSETS = [
   './', './index.html', './css/styles.css', './js/optimizer.js', './js/calcs.js', './js/material.js', './js/app.js',
   './manifest.json', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png',
-  './fonts/space-grotesk-latin.woff2', './fonts/jetbrains-mono-latin.woff2'
+  './fonts/inter-latin.woff2'
 ];
 self.addEventListener('install', e => {
   // cache: 'reload' umgeht den HTTP-Cache (GitHub Pages: max-age=600), damit wirklich die neuen Dateien landen.

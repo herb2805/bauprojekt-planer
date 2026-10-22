@@ -3,7 +3,7 @@
 Mobile-first PWA (plain HTML/CSS/JS, no backend) for Holzlisten, Zuschnittoptimierung und Bestellstatus.
 
 - `index.html` – Shell with tab bar (Projekte, Holzliste, Lager, Zuschnitt, Material, Bestellung)
-- `css/styles.css` – all styling, colours/sizes as CSS variables in `:root` (Design „Blaupause“)
+- `css/styles.css` – all styling, colours/sizes as CSS variables in `:root` (Design 7B2A „Farbe Icon“)
 - `js/optimizer.js` – 1D cutting-stock optimizer (FFD heuristics + downsizing + branch & bound, exact within node limit)
 - `js/material.js`, `js/calcs.js` – Mengenrechner (Beton/Putz bzw. alle weiteren)
 - `js/app.js` – UI, localStorage (`bauplaner.v1`), JSON export/import, order text
@@ -58,13 +58,25 @@ Alle Vorgaben sind im Editor änderbar und Preise sind optional. Die Ergebnisse 
 Die Quellen für alle Richtwerte stehen im Kopf von `js/calcs.js` (neue Rechner) und `js/material.js` (Beton/Putz). Die Tests liegen in `test/calc.test.js`.
 Ältere Einträge ohne `kind` werden beim Laden als Beton übernommen.
 
-## Design „Blaupause“
+## Design 7B2A „Farbe Icon“
 
-Das Design ist Variante 2 von Design Dirk: dunkles Blaupausen-Raster mit Neon-Akzenten.
+Das Design ist die finale Variante 7B2A von Design Dirk: dunkles Graphit mit Flächen aus Glas (Liquid-Glass-Look).
 
-- **Farben:** Hintergrund `#0A1224` mit Flächen `#111C33` und `#1A2A4D`, Text `#E8F0FF`. Die Akzente sind Cyan `#22E4FF`, Magenta `#FF3DCB`, Lime `#B6FF3B`, Amber `#FFB020` und Violett `#9B7BFF`.
-- **Schriften:** Space Grotesk für Überschriften und Text, JetBrains Mono für Maße. Beide liegen selbst gehostet in `fonts/` (SIL OFL 1.1, siehe `fonts/OFL-*.txt`), nur als Latin-Subset.
-- Icons und `manifest.json` stammen aus v2 (`short_name` „Bauprojekt-Planer“).
+- **Flächen:** Der Hintergrund ist Graphit `#141618` (Verlauf `#1A1C1F` → `#101113`). Karten sind aus Glas: `rgba(255,255,255,.07–.11)` mit `backdrop-filter: blur(26px) saturate(150%)`, einer 1-px-Kante `rgba(255,255,255,.13)` und einer hellen Innenkante. Die Radien sind 26/18/14 px.
+- **Fallback:** Ohne `backdrop-filter` (`@supports not …`) bekommen Karten, Tab-Leiste und Toasts deckende Flächen (`#1F2225` / `#25292C`).
+- **Farben:**
+  - Text `#ECEEEF`, Grau `#BCC1C5`.
+  - Primär ist Mint `#5FD3B5`. Buttons haben einen Verlauf `#79DFC4` → `#5FD3B5` → `#4CBFA2` mit Text `#0B1A16`, der Akzent ist `#6FDDC0`.
+  - Gedämpfte Status: ok `#A6DEC8`, mittel `#E0CFA2`, offen `#EDB8B5`, angefragt `#C9BDF2`.
+- **Icon-Felder statt Farbrändern:** Projekte, Holzarten und Material-Rechner tragen ein farbiges Icon-Feld. Die Farben sind Mint `#6FDDC0`, Apricot `#F0A97E`, Flieder `#B9A6F0` und Gelb `#E8D37A`. Die Farbe steckt nur im Icon-Feld und im Fortschrittsbalken; farbige Randstreifen gibt es keine.
+  - Rechner nach Kategorie: Rohbau Apricot, Innenausbau Flieder, Außen Mint, Sonstiges Gelb.
+  - Holzgruppen wechseln der Reihe nach durch die vier Farben.
+- **Tab-Leiste:** schwebende Glas-Pille mit 6 Tabs (passt ab 390 px); der Inhalt hat unten genug Abstand.
+- **Kontrast:** Alle Texte erfüllen WCAG AA (≥ 4,5:1).
+- **Schrift:** Inter (Variable, Latin-Subset) liegt selbst gehostet in `fonts/inter-latin.woff2` (SIL OFL 1.1, siehe `fonts/OFL-Inter.txt`).
+- **Icons und Manifest** stammen aus v7b2a (`short_name` „Bauprojekt-Planer“, Theme/Hintergrund `#141618`).
+
+Aktueller Screenshot: `screenshot-7b2a.png`. Ältere `screenshot-*.png` zeigen noch das frühere Design.
 
 ## Service Worker / Updates
 

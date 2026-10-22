@@ -1,13 +1,13 @@
 {
-  "name": "Blaupause – Bauprojekt-Planer",
+  "name": "Bauprojekt-Planer",
   "short_name": "Bauprojekt-Planer",
   "description": "Holzlisten, Zuschnitt, Materialmengen (Beton, Putz, Mauerwerk, Fliesen …) und Bestellungen für Bauprojekte",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#0A1224",
-  "theme_color": "#0A1224",
+  "background_color": "#141618",
+  "theme_color": "#141618",
   "lang": "de",
   "icons": [
     {

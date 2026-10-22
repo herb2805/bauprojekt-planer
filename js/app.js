@@ -149,11 +149,49 @@
     warn: '<path d="M12 3 2 21h20z"/><path d="M12 10v5M12 18h.01"/>', copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>'
   };
   const ic = (n, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
+  // Icon-Feld (Design 7B2A „Farbe Icon“): die Farbe sitzt nur hier und im Fortschritt – keine farbigen Kartenränder.
+  const TILE = {
+    haus: '<path d="M3 12 12 5l9 7"/><path d="M6 10.5V19h12v-8.5"/><path d="M10 19v-5h4v5"/>',
+    treppe: '<path d="M4 20h16"/><path d="M4 20v-4h4v-4h4V8h4V4h4"/>',
+    terrasse: '<circle cx="17" cy="6" r="2.5"/><path d="M3 13h18M3 17h18M3 21h18M6 13v8M12 13v8M18 13v8"/>',
+    kiste: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M4 12h16M10 16h4M7 8l2-4h6l2 4"/>',
+    kvh: '<rect x="6" y="6" width="12" height="12" rx="1.5"/><path d="M6 6l12 12" opacity=".5"/>',
+    hoch: '<rect x="7" y="3.5" width="10" height="17" rx="1.5"/><path d="M7 3.5l10 17" opacity=".5"/>',
+    schmal: '<rect x="8.5" y="4" width="7" height="16" rx="1.5"/><path d="M8.5 4l7 16" opacity=".5"/>',
+    flach: '<rect x="3.5" y="8.5" width="17" height="7" rx="1.5"/><path d="M3.5 8.5l17 7" opacity=".5"/>',
+    beton: '<path d="M5 9h14l-1.5 11h-11z"/><path d="M8 9V5h8v4M9 14h6"/>',
+    putz: '<path d="M4 15h11l3-3H7z"/><path d="M11 15v3a2 2 0 0 0 2 2h0"/><path d="M14 4h6v4"/>',
+    mauer: '<rect x="3" y="5" width="18" height="14" rx="1.5"/><path d="M3 9.7h18M3 14.3h18M9 5v4.7M15 5v4.7M6 9.7v4.6M12 9.7v4.6M18 9.7v4.6M9 14.3V19M15 14.3V19"/>',
+    estrich: '<path d="M3 17h18"/><path d="M3 13h18" opacity=".5"/><path d="M8 13l3-6h7l-3 6"/>',
+    fliesen: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
+    trockenbau: '<rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M9 3v18M15 3v18" opacity=".55"/>',
+    daemmung: '<path d="M3 6c3 0 3 3 6 3s3-3 6-3 3 3 6 3M3 12c3 0 3 3 6 3s3-3 6-3 3 3 6 3M3 18h18"/>',
+    farbe: '<rect x="4" y="4" width="13" height="6" rx="1.5"/><path d="M17 7h3v5h-8v3"/><rect x="10.5" y="15" width="3" height="6" rx="1"/>',
+    schutt: '<path d="M3 19 9 9l4 5 3-3 5 8z"/><circle cx="17" cy="6" r="1.4"/>',
+    pflaster: '<path d="M3 5h8v6H3zM13 5h8v6h-8zM3 13h5v6H3zM10 13h11v6H10z"/>',
+    dach: '<path d="M2 13 12 4l10 9"/><path d="M5 11v9h14v-9"/><path d="M8 14h8M8 17h8" opacity=".55"/>',
+    frei: '<path d="M9 3h6l-1 4h-4z"/><path d="M12 7v14M9.5 10h5M9.5 13h5M9.5 16h5"/>'
+  };
+  const KCOL = ['mint', 'apri', 'flie', 'gelb'];
+  const CAT_COL = { rohbau: 'apri', ausbau: 'flie', aussen: 'mint', sonst: 'gelb' };
+  const tile = (icon, col, cls = '') => `<span class="kic k-${col} ${cls}" aria-hidden="true"><svg viewBox="0 0 24 24">${TILE[icon] || TILE.frei}</svg></span>`;
+  const projTile = i => tile(['haus', 'treppe', 'terrasse', 'kiste'][i % 4], KCOL[i % 4]);
+  /** Holz-Querschnitt → passendes Profil-Icon (quadratisch, hochkant, schmal, flach). */
+  function woodIcon(key) {
+    const [a, b] = normSection(String(key).split('|')[1]).split('x').map(Number);
+    if (!(a > 0 && b > 0)) return 'kvh';
+    const r = Math.max(a, b) / Math.min(a, b);
+    if (r < 1.2) return 'kvh';
+    if (Math.min(a, b) <= 4 || r >= 3) return 'flach';
+    return r < 1.6 ? 'hoch' : 'schmal';
+  }
+  const woodTile = (key, idx, cls) => tile(woodIcon(key), KCOL[idx % 4], cls);
+  const kindTile = (kind, cls) => tile(kind || 'beton', CAT_COL[kindInfo(kind).cat] || 'gelb', cls);
 
   function render() {
     const tab = currentTab();
     const p = current();
-    $('#current-project').textContent = tab === 'projekte' ? 'Blaupause' : (p ? p.name : 'Kein Projekt');
+    $('#current-project').textContent = tab === 'projekte' ? 'Bauprojekt-Planer' : (p ? p.name : 'Kein Projekt');
     $('#page-title').textContent = TITLES[tab];
     $('#top-action').innerHTML = tab === 'projekte'
       ? `<button class="iconbtn iconbtn--acc" data-act="toggle-new-project" aria-label="Neues Projekt">${ic('plus')}</button>` : '';
@@ -175,7 +213,7 @@
         <label class="lbl" for="np-name">Neues Projekt</label>
         <div class="frow"><input id="np-name" class="grow" name="name" placeholder="z. B. Terrasse" required>
         <button class="btn btn--pri">Anlegen</button></div></form>` : '';
-    const cards = state.projects.map(p => {
+    const cards = state.projects.map((p, pi) => {
       const st = projectStats(p), active = p.id === state.currentId;
       const menu = menuFor === p.id ? `<div class="row menu">
           <button class="btn btn--ghost btn--sm" data-act="rename-project" data-id="${p.id}">Umbenennen</button>
@@ -183,8 +221,8 @@
           <button class="btn btn--danger btn--sm" data-act="delete-project" data-id="${p.id}">Löschen</button></div>` : '';
       const sub = `${esc(st.mats.join(', ') || 'Noch keine Holzliste')} · ${st.parts} Teile${p.materials.length ? ' · ' + p.materials.length + ' Material' : ''}`;
       if (!active) {
-        return `<div class="card project">
-          <div class="prow"><div class="grow"><h3>${esc(p.name)}</h3><div class="muted small">${sub}</div></div>
+        return `<div class="card project k-${KCOL[pi % 4]}">
+          <div class="prow">${projTile(pi)}<div class="grow"><h3>${esc(p.name)}</h3><div class="muted small">${sub}</div></div>
             <button class="iconbtn iconbtn--ghost iconbtn--sm" data-act="project-menu" data-id="${p.id}" aria-label="Aktionen">${ic('dots')}</button></div>
           ${menu}
           <button class="btn btn--ghost btn--block" style="margin-top:12px" data-act="open-project" data-id="${p.id}">Öffnen</button>
@@ -195,8 +233,8 @@
       const pct = lines.length ? Math.round(done / lines.length * 100) : 0;
       const stangen = lines.filter(l => !l.mat && !l.tooLong).reduce((s, l) => s + l.count, 0);
       const step = (ok, label) => `<li class="${ok ? 'done' : ''}">${ok ? ic('check', 's') : ''}${label}</li>`;
-      return `<div class="card project project--active">
-        <div class="prow"><span class="pill pill--live">Aktiv</span>
+      return `<div class="card project project--active k-${KCOL[pi % 4]}">
+        <div class="prow">${projTile(pi)}<span class="pill pill--live">Aktiv</span><span class="grow"></span>
           <button class="iconbtn iconbtn--glass iconbtn--sm" data-act="project-menu" data-id="${p.id}" aria-label="Aktionen">${ic('dots')}</button></div>
         <h2>${esc(p.name)}</h2><div class="muted">${sub}</div>
         ${menu}
@@ -205,7 +243,7 @@
           <li class="cur">Geliefert ${done}/${lines.length}</li></ul>
         <div class="kpis"><div><b>${fmt(st.netM, 2)} m</b><span>Holz netto</span></div><div><b>${stangen}</b><span>Stangen</span></div>
           <div><b>${p.materials.length}</b><span>Material</span></div></div>
-        <button class="btn btn--white btn--block" data-go="${p.items.length ? 'zuschnitt' : 'liste'}">${p.items.length ? 'Weiter: Zuschnitt ansehen' : 'Weiter: Holzliste anlegen'}</button>
+        <button class="btn btn--pri btn--block" data-go="${p.items.length ? 'zuschnitt' : 'liste'}">${p.items.length ? 'Weiter: Zuschnitt ansehen' : 'Weiter: Holzliste anlegen'}</button>
       </div>`;
     }).join('');
     return `${newForm}${cards || ''}
@@ -236,11 +274,11 @@
     const mats = [...new Set(['KVH', 'BSH', 'Latte', 'Profilholz', 'Dachlatte', 'OSB', ...p.items.map(i => i.material)].filter(Boolean))];
     const totalParts = p.items.reduce((s, i) => s + (i.qty || 0), 0);
     const totalM = p.items.reduce((s, i) => s + (i.qty || 0) * i.length, 0) / 100;
-    let list = '';
+    let list = '', gi = 0;
     for (const [key, items] of gmap) {
       const des = [...new Set(items.map(i => i.designation || '–'))];
       const sumM = items.reduce((s, i) => s + i.qty * i.length, 0) / 100;
-      list += `<div class="grph"><span>${esc(groupLabel(key))}</span><span class="mono">${fmt(sumM, 2)} m</span></div>
+      list += `<div class="grph">${woodTile(key, gi++, 'kic--sm')}<span class="grow">${esc(groupLabel(key))}</span><span class="mono">${fmt(sumM, 2)} m</span></div>
         ${items.map(i => `<div class="lrow ${editingItemId === i.id ? 'lrow--edit' : ''}">
           <span class="dot c${colorIdx(des, i.designation || '–')}"></span>
           <div class="lmain"><span class="len">${fmt(i.length, 2)} cm</span><span class="muted small">${esc(i.designation || '–')}</span></div>
@@ -276,10 +314,10 @@
   // ---------- views: Lager ----------
   function viewStock(p) {
     const gs = [...groups(p).keys()];
-    const cards = gs.map(key => {
+    const cards = gs.map((key, gi) => {
       const st = stockFor(p, key);
       return `<div class="card stack" data-group="${esc(key)}">
-        <div class="group-head"><h3>${esc(groupLabel(key))}</h3>
+        <div class="group-head">${woodTile(key, gi, 'kic--sm')}<h3 class="grow">${esc(groupLabel(key))}</h3>
           <select data-act="price-unit" data-key="${esc(key)}" class="select--sm" aria-label="Preisangabe">
             <option value="piece" ${st.priceUnit !== 'meter' ? 'selected' : ''}>€ / Stück</option>
             <option value="meter" ${st.priceUnit === 'meter' ? 'selected' : ''}>€ / lfm</option>
@@ -324,7 +362,7 @@
     const res = optimizeProject(p);
     if (!res.length) return `<p class="muted center">Erst Positionen in der Holzliste anlegen.</p>`;
     let totalCost = 0, anyCost = false, totalPieces = 0, stockTotal = 0, waste = 0, allExact = true;
-    const cards = res.map(g => {
+    const cards = res.map((g, gi) => {
       const r = g.res, s = r.summary;
       totalPieces += s.pieces; stockTotal += s.stockTotal; waste += s.waste; allExact = allExact && r.exact;
       if (s.cost != null) { totalCost += s.cost; anyCost = true; }
@@ -337,7 +375,7 @@
         </div>`).join('');
       const wpct = s.stockTotal ? s.waste / s.stockTotal * 100 : 0;
       return `<div class="cgrp">
-        <div class="cgh"><b>${esc(g.label)}</b>${s.byStock.length ? `<span class="tag">${stockTag(s.byStock)}</span>` : ''}<span class="vs">${fmt(wpct, 1)} %</span></div>
+        <div class="cgh">${woodTile(g.key, gi, 'kic--sm')}<b>${esc(g.label)}</b>${s.byStock.length ? `<span class="tag">${stockTag(s.byStock)}</span>` : ''}<span class="vs">${fmt(wpct, 1)} %</span></div>
         ${pats}${tooLong}
         <p class="alt">${r.exact ? 'Optimal' : 'Näherung'} · ${s.pieces} Stangen · Verschnitt ${fmt(s.waste)} cm${s.cost != null ? ' · ' + eur(s.cost) : ''}</p>
       </div>`;
@@ -445,7 +483,7 @@
   function pickerHtml() {
     return `<div class="card picker"><div class="cgh"><b>Was möchtest du berechnen?</b><button class="iconbtn iconbtn--xs" data-act="mat-cancel" aria-label="Schließen">${ic('x', 's')}</button></div>
       ${Calcs.CATEGORIES.map(c => `<div class="pick-cat"><span class="eyebrow">${esc(c.label)}</span><div class="pick-grid">
-        ${c.kinds.map(k => { const ki = kindInfo(k); return `<button type="button" class="pick pick--${ki.cat}" data-act="mat-new" data-kind="${k}"><b>${esc(ki.label)}</b><span>${esc(ki.sub)}</span></button>`; }).join('')}
+        ${c.kinds.map(k => { const ki = kindInfo(k); return `<button type="button" class="pick" data-act="mat-new" data-kind="${k}">${kindTile(k, 'kic--sm')}<span class="pick__t"><b>${esc(ki.label)}</b><span>${esc(ki.sub)}</span></span></button>`; }).join('')}
       </div></div>`).join('')}</div>`;
   }
   function editorHtml(d) {
@@ -487,7 +525,7 @@
         <div class="frow">${mf('zuschlag', 'Zuschlag', '%', d)}${mf('bagKg', 'Sack', 'kg', d)}${mf('bagPrice', 'Preis/Sack', '€', d, 'placeholder="–"')}</div>`;
     }
     return `<form class="card form editor" data-form="material">
-      <div class="cgh"><span class="pill pill--${kindInfo(d.kind).cat}">${esc(kindInfo(d.kind).label)}</span><b>${matDraft.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</b>
+      <div class="cgh">${kindTile(d.kind, 'kic--sm')}<b><span class="kind">${esc(kindInfo(d.kind).label)}</span>${matDraft.id ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</b>
         ${matDraft.id ? '' : `<button type="button" class="btn btn--ghost btn--xs" data-act="mat-pick">Art wechseln</button>`}</div>
       <label class="field"><span class="lbl">Bezeichnung</span><input data-mf="name" value="${esc(d.name)}" placeholder="${esc(generic ? Calcs.CALCS[d.kind].ph : d.kind === 'putz' ? 'z. B. Kellerwand Nord' : 'z. B. Pfostenlöcher')}"></label>
       ${body}
@@ -501,12 +539,12 @@
     const total = p.materials.length ? `<div class="card costcard">
         <div class="ctop"><span class="muted">Projekt gesamt · ${p.materials.length} Einträge</span>${agg.cost != null ? `<span class="pill ${agg.allPriced ? 'pill--ok' : 'pill--plan'}">${agg.allPriced ? 'mit Preisen' : 'Preise teilweise'}</span>` : '<span class="pill pill--idea">ohne Preise</span>'}</div>
         ${agg.cost != null ? `<b class="big">${eur(agg.cost)}</b>` : ''}
-        <div class="mlist mlist--flat">${agg.lines.map(l => `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${Material.lineNote(l) ? esc(Material.lineNote(l)) + ' · ' : ''}${esc(l.entries.join(', '))}</span></div>
+        <div class="mlist mlist--flat">${agg.lines.map(l => `<div class="mrow">${lineTile(p, l.key)}<div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${Material.lineNote(l) ? esc(Material.lineNote(l)) + ' · ' : ''}${esc(l.entries.join(', '))}</span></div>
           <div class="mright"><span class="price">${l.continuous ? fmt(l.qty, 2) : l.qty} ${l.unit}</span>${l.cost != null ? `<span class="muted small mono">${eur(l.cost)}</span>` : ''}</div></div>`).join('')}</div>
         <button class="btn btn--ghost btn--sm" data-go="bestellung">In Bestellung ansehen</button>
       </div>` : '';
     const entryHtml = e => `<div class="card mentry">
-        <div class="cgh"><span class="pill pill--${kindInfo(e.kind).cat}">${esc(kindInfo(e.kind).label)}</span><b>${esc(e.name)}</b>
+        <div class="cgh">${kindTile(e.kind, 'kic--sm')}<b><span class="kind">${esc(kindInfo(e.kind).label)}</span>${esc(e.name)}</b>
           <button class="iconbtn iconbtn--xs" data-act="mat-edit" data-id="${e.id}" aria-label="Bearbeiten">${ic('edit', 's')}</button>
           <button class="iconbtn iconbtn--xs" data-act="mat-del" data-id="${e.id}" aria-label="Löschen">${ic('x', 's')}</button></div>
         <p class="mdesc">${esc(describe(e))}</p>
@@ -533,9 +571,14 @@
     for (const l of Material.aggregate(p.materials || []).lines) {
       if (!(l.qty > 0)) continue;
       const key = 'mat|' + l.key;
-      lines.push({ key, mat: true, label: l.label, note: Material.lineNote(l), qty: l.qty, unit: l.unit, continuous: l.continuous, entries: l.entries, cost: l.cost, status: (p.orders || {})[key] || 'offen' });
+      lines.push({ key, mkey: l.key, mat: true, label: l.label, note: Material.lineNote(l), qty: l.qty, unit: l.unit, continuous: l.continuous, entries: l.entries, cost: l.cost, status: (p.orders || {})[key] || 'offen' });
     }
     return lines;
+  }
+  /** Material-Zeile → Icon-Feld der Rechner-Art, aus der die Position stammt. */
+  function lineTile(p, key) {
+    const e = (p.materials || []).find(m => { try { return (Material.entryResult(m).lines || []).some(x => x.key === key); } catch (_) { return false; } });
+    return kindTile(e ? e.kind : 'frei', 'kic--row');
   }
   const matQty = l => `${l.continuous ? fmt(l.qty, 2) : l.qty} ${l.unit}`;
 
@@ -585,12 +628,14 @@
     const stack = STATUSES.filter(s => cnt(s)).map(s => `<i class="${s}" style="flex:${cnt(s)}"></i>`).join('');
     const legend = STATUSES.map(s => `<div><i class="lg ${s}"></i>${s[0].toUpperCase() + s.slice(1)}<b>${cnt(s)}</b></div>`).join('');
     const shown = lines.filter(l => orderFilter === 'alle' || l.status === orderFilter);
+    const gidx = new Map(optimizeProject(p).map((g, i) => [g.key, i]));
+    const rtile = l => l.mat ? lineTile(p, l.mkey) : woodTile(l.group.key, gidx.get(l.group.key) || 0, 'kic--row');
     const row = l => {
       const sel = `<select class="st ${l.status}" data-act="order-status" data-key="${esc(l.key)}" aria-label="Status">
         ${STATUSES.map(s => `<option value="${s}" ${s === l.status ? 'selected' : ''}>${s}</option>`).join('')}</select>`;
-      if (l.tooLong) return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="warn-ink">Sonderlänge ${l.tooLong.map(x => fmt(x.length)).join(', ')} cm</span></div><div class="mright"><span class="price">–</span>${sel}</div></div>`;
-      if (l.mat) return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${matQty(l)}${l.note ? ` (${esc(l.note)})` : ''} · ${esc(l.entries.join(', '))}</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : matQty(l)}</span>${sel}</div></div>`;
-      return `<div class="mrow"><div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${l.count} × ${fmt(l.stockLength / 100, 2)} m · ${fmt(l.count * l.stockLength / 100, 2)} lfm</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : l.count + ' Stk'}</span>${sel}</div></div>`;
+      if (l.tooLong) return `<div class="mrow">${rtile(l)}<div class="mtxt"><b>${esc(l.label)}</b><span class="warn-ink">Sonderlänge ${l.tooLong.map(x => fmt(x.length)).join(', ')} cm</span></div><div class="mright"><span class="price">–</span>${sel}</div></div>`;
+      if (l.mat) return `<div class="mrow">${rtile(l)}<div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${matQty(l)}${l.note ? ` (${esc(l.note)})` : ''} · ${esc(l.entries.join(', '))}</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : matQty(l)}</span>${sel}</div></div>`;
+      return `<div class="mrow">${rtile(l)}<div class="mtxt"><b>${esc(l.label)}</b><span class="muted">${l.count} × ${fmt(l.stockLength / 100, 2)} m · ${fmt(l.count * l.stockLength / 100, 2)} lfm</span></div><div class="mright"><span class="price">${l.cost != null ? eur(l.cost) : l.count + ' Stk'}</span>${sel}</div></div>`;
     };
     const wood = shown.filter(l => !l.mat), mat = shown.filter(l => l.mat);
     return `<div class="card costcard">
